@@ -1,25 +1,38 @@
 const router = require('express').Router();
+const { celebrate, Joi } = require('celebrate');
+
+const { URL_REGEX } = require('../utils/constants');
 const {
-  getUsers,
-  findUser,
-  createUser,
-  updateUserAvatar,
-  updateUserProfile,
+  getUsersInfo,
+  getUserInfo,
+  getCurrentUserInfo,
+
+  setUserInfo,
+  setUserAvatar,
 } = require('../controllers/users');
 
-// возвращает всех пользователей
-router.get('/', getUsers);
+router.get('/', getUsersInfo);
+router.get('/me', getCurrentUserInfo);
 
-// возвращает пользователя по _id
-router.get('/:userId', findUser);
+router.get('/:id', celebrate({
+  params: Joi.object().keys({
+    id: Joi.string().length(24).hex().required(),
+  }),
+}), getUserInfo);
 
-// создаёт пользователя
-router.post('/', createUser);
+router.patch('/me', celebrate({
+  body: Joi.object().keys({
+    name: Joi.string().min(2).max(30),
+    about: Joi.string().min(2).max(30),
+  }),
+}), setUserInfo);
 
-// обновляет профиль
-router.patch('/me', updateUserProfile);
-
-// обновляет аватар
-router.patch('/me/avatar', updateUserAvatar);
+router.patch('/me/avatar', celebrate({
+  body: Joi.object().keys({
+    avatar: Joi
+      .string()
+      .pattern(URL_REGEX),
+  }),
+}), setUserAvatar);
 
 module.exports = router;

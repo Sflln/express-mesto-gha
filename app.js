@@ -1,46 +1,47 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const router = require('./routes');
-const { ERROR_CODE_VALIDATION, ERROR_CODE_SERVER } = require('./errors/errorsStatus');
+const helmet = require('helmet');
+const bodyParser = require('body-parser');
+const { errors } = require('celebrate');
 
+const limiter = require('./middlewares/rateLimiter');
+
+const routeSignup = require('./routes/signup');
+const routeSignin = require('./routes/signin');
+
+const auth = require('./middlewares/auth');
+
+const routeUsers = require('./routes/users');
+const routeCards = require('./routes/cards');
+
+const NotFoundError = require('./errors/NotFoundError');
+const errorHandler = require('./middlewares/errorHandler');
+
+const URL = 'mongodb://localhost:27017/mestodb';
 const { PORT = 3000 } = process.env;
+
+mongoose.set('strictQuery', true);
+mongoose.connect(URL);
+
 const app = express();
 
-// парсим данные (собираем пакеты)
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(helmet());
 
-// подключаемся к серверу mongo
-mongoose.connect('mongodb://localhost:27017/mestodb', {
-  useNewUrlParser: true,
-  useCreateIndex: true,
-  useFindAndModify: false,
-  useUnifiedTopology: true,
-});
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// добавляем в каждый запрос объект user
-app.use((req, res, next) => {
-  req.user = { _id: '60522a5cb72010206ce86de4' };
-  next();
-});
+app.use(limiter);
 
-// корневой роут
-app.use(router);
+app.use('/', routeSignup);
+app.use('/', routeSignin);
 
-// обрабатываем ошибки
-app.use((err, req, res, next) => {
-  if (err.name === 'CastError') {
-    res.status(ERROR_CODE_VALIDATION)
-      .send({ message: 'Переданы некорректные данные' });
-  } else if (err.name === 'ValidationError') {
-    res.status(ERROR_CODE_VALIDATION)
-      .send({ message: `${Object.values(err.errors).map((error) => error.message).join(', ')}` });
-  } else {
-    const { statusCode = ERROR_CODE_SERVER, message } = err;
-    res.status(statusCode)
-      .send({ message: statusCode === ERROR_CODE_SERVER ? 'На сервере произошла ошибка' : message });
-  }
-  next();
-});
+app.use(auth);
 
-app.listen(PORT, () => PORT);
+app.use('/users', routeUsers);
+app.use('/cards', routeCards);
+
+app.use((req, res, next) => next(new NotFoundError('Страницы по запрошенному URL не существует')));
+app.use(errors());
+app.use(errorHandler);
+
+app.listen(PORT);

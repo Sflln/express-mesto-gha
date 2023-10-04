@@ -1,30 +1,50 @@
 const mongoose = require('mongoose');
 
-// описание схемы карточки
-const cardSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, 'поле с названием не может быть пустым'],
-    minlength: [2, 'название карточки не может быть короче двух символов'],
-    maxlength: [30, 'название карточки не может быть длиннее 30 символов'],
-  },
-  link: {
-    type: String,
-    required: [true, 'ссылка на фото обязательна'],
-  },
-  owner: {
-    type: mongoose.ObjectId,
-    required: true,
-  },
-  likes: [{
-    type: mongoose.ObjectId,
-    default: [],
-  }],
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+const { Schema } = mongoose;
+const { ObjectId } = mongoose.Schema.Types;
 
-// создаём модель и экспортируем её
+const { URL_REGEX } = require('../utils/constants');
+
+const cardSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      validate: {
+        validator: ({ length }) => length >= 2 && length <= 30,
+        message: 'Имя карточки должно быть длиной от 2 до 30 символов',
+      },
+    },
+
+    link: {
+      type: String,
+      required: true,
+      validate: {
+        validator: (url) => URL_REGEX.test(url),
+        message: 'Требуется ввести URL',
+      },
+    },
+
+    owner: {
+      type: ObjectId,
+      ref: 'user',
+      required: true,
+    },
+
+    likes: [{
+      type: ObjectId,
+      ref: 'user',
+      default: [],
+    }],
+
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  {
+    versionKey: false,
+  },
+);
+
 module.exports = mongoose.model('card', cardSchema);
