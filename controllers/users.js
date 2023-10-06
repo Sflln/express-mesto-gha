@@ -50,24 +50,14 @@ function registerUser(req, res, next) {
 
 function loginUser(req, res, next) {
   const { email, password } = req.body;
-
   User
     .findUserByCredentials(email, password)
-    .then(({ _id: userId }) => {
-      if (userId) {
-        const token = jwt.sign(
-          { userId },
-          SECRET_SIGNING_KEY,
-          { expiresIn: '7d' },
-        );
-
-        return res.send({ _id: token });
-      }
-
-      throw new UnauthorizedError('Неправильные почта или пароль');
+    .then((user) => {
+      const token = jwt.sign({ _id: user._id }, SECRET_KEY, { expiresIn: '7d' });
+      res.status(OK_STATUS).send({ token });
     })
     .catch(next);
-}
+};
 
 function getUsersInfo(_, res, next) {
   User
@@ -97,21 +87,14 @@ function getUserInfo(req, res, next) {
 
 function getCurrentUserInfo(req, res, next) {
   const { userId } = req.user;
-
-  User
-    .findById(userId)
-    .then((user) => {
-      if (user) return res.send({ user });
-
-      throw new NotFoundError('Пользователь с таким id не найден');
-    })
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        next(new InaccurateDataError('Передан некорректный id'));
-      } else {
-        next(err);
-      }
-    });
+  User.findById(req.user._id)
+    .orFail(new NotFoundError('Пользователь по указанному _id не найден'))
+    .then((user) => res.send(user))
+    .catch(next);
+  User.findById(userId)
+    .orFail(new NotFoundError('Пользователь с таким id не найден'))
+    .then((user) => (res.send({ user })))
+    .catch(next);
 }
 
 function setUserInfo(req, res, next) {
@@ -136,7 +119,7 @@ function setUserInfo(req, res, next) {
       throw new NotFoundError('Пользователь с таким id не найден');
     })
     .catch((err) => {
-      if (err.name === 'ValidationError' || err.name === 'CastError') {
+      if (err.name === 'ValidationError') {
         next(new InaccurateDataError('Переданы некорректные данные при обновлении профиля пользователя'));
       } else {
         next(err);
@@ -165,7 +148,7 @@ function setUserAvatar(req, res, next) {
       throw new NotFoundError('Пользователь с таким id не найден');
     })
     .catch((err) => {
-      if (err.name === 'ValidationError' || err.name === 'CastError') {
+      if (err.name === 'ValidationError') {
         next(new InaccurateDataError('Переданы некорректные данные при обновлении профиля пользователя'));
       } else {
         next(err);

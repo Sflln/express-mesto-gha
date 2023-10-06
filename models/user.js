@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
-
+const AuthError = require('../errors/AuthError');
 const { Schema } = mongoose;
 
 const { URL_REGEX } = require('../utils/constants');
@@ -21,19 +21,13 @@ const userSchema = new Schema(
       type: String,
       required: true,
       select: false,
-      validate: {
-        validator: ({ length }) => length >= 6,
-        message: 'Пароль должен состоять минимум из 6 символов',
-      },
     },
 
     name: {
       type: String,
       default: 'Жак-Ив Кусто',
-      validate: {
-        validator: ({ length }) => length >= 2 && length <= 30,
-        message: 'Имя пользователя должно быть длиной от 2 до 30 символов',
-      },
+      minlength: [2, 'Имя не может быть короче 2 символов'],
+      maxlength: [30, 'Имя не может быть длиннее 30 символов'],
     },
 
     about: {
@@ -63,20 +57,22 @@ const userSchema = new Schema(
           .findOne({ email })
           .select('+password')
           .then((user) => {
-            if (user) {
-              return bcrypt.compare(password, user.password)
-                .then((matched) => {
-                  if (matched) return user;
-
-                  return Promise.reject();
-                });
+            if (!user) {
+              return Promise.reject(new AuthError('Неправильные почта или пароль'));
             }
-
-            return Promise.reject();
-          });
+            return bcrypt.compare(password, user.password)
+              .then((matched) => {
+                if (!matched) {
+                  return Promise.reject(new AuthError('Неправильные почта или пароль'));
+                }
+                return user;
+              }
+            );
+          }
+        );
       },
     },
-  },
+  }
 );
 
 module.exports = mongoose.model('user', userSchema);
